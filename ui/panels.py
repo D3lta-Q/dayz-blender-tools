@@ -196,6 +196,7 @@ class DAYZ_PT_GrassPlacerPanel(bpy.types.Panel):
 panels = (
     DAYZ_PT_main_panel,
     DAYZ_PT_GrassPlacerPanel,  # Add the grass panel here
+    DAYZ_PT_BatchPropertiesPanel,
 )
 
 def register():
