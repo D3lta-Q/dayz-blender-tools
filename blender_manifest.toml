@@ -1,0 +1,12 @@
+schema_version = "1.0.0"
+
+id = "deltas_dayz_asset_tools"
+version = "1.0.0"
+name = "Delta's DayZ Asset Tools"
+tagline = "A collection of various tools to help automate/speed up the process of configuring 3D assets to be imported into DayZ."
+maintainer = "DeltaQ <zackry.hujber02@gmail.com>"
+license = ["GPL-3.0-or-later"]
+type = "add-on"
+
+[permissions]
+files = "Import/export files"
