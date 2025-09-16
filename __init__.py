@@ -10,15 +10,29 @@ bl_info = {
 }
 
 import bpy
-from . import operators, ui
 
 def register():
-    operators.register()
-    ui.register()
+    print("DayZ Asset Tools: Starting registration...")
+    
+    try:
+        from . import operators, ui
+        operators.register()
+        ui.register()
+        print("DayZ Asset Tools: Registration successful!")
+    except Exception as e:
+        print(f"DayZ Asset Tools: Registration failed - {e}")
+        raise e
 
 def unregister():
-    operators.unregister()
-    ui.unregister()
+    print("DayZ Asset Tools: Starting unregistration...")
+    
+    try:
+        from . import operators, ui
+        operators.unregister()
+        ui.unregister()
+        print("DayZ Asset Tools: Unregistration successful!")
+    except Exception as e:
+        print(f"DayZ Asset Tools: Unregistration failed - {e}")
 
 if __name__ == "__main__":
     register()

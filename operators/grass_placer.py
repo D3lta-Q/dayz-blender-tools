@@ -572,7 +572,6 @@ grass_classes = (
     DAYZ_OT_AddGrassObject,
     DAYZ_OT_RemoveGrassObject,
     DAYZ_OT_GenerateGrass,
-    DAYZ_PT_GrassPlacerPanel,
 )
 
 def register_grass_placer():
