@@ -17,6 +17,72 @@ class DAYZ_PT_main_panel(bpy.types.Panel):
         # Placeholder for future tools
         box.label(text="Additional tools will be added here", icon='INFO')
 
+class DAYZ_PT_BatchPropertiesPanel(bpy.types.Panel):
+    """Batch Add Named Properties panel within DayZ tools"""
+    bl_label = "Batch Add Named Properties"
+    bl_idname = "DAYZ_PT_batch_properties_panel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'DayZ Tools'
+    bl_parent_id = "DAYZ_PT_main_panel"
+
+    def draw(self, context):
+        layout = self.layout
+        settings = context.scene.dayz_batch_properties_settings
+
+        # Target Directory Section
+        box = layout.box()
+        box.label(text="Target Directory", icon='FOLDER_REDIRECT')
+        
+        col = box.column()
+        row = col.row()
+        row.prop(settings, "target_directory", text="")
+        row.operator("dayz.select_directory", text="", icon='FILEBROWSER')
+        
+        col.prop(settings, "recursive_search")
+
+        layout.separator()
+
+        # Named Properties Section
+        box = layout.box()
+        box.label(text="Named Properties", icon='PROPERTIES')
+        
+        row = box.row()
+        row.operator("dayz.add_named_property", text="Add", icon='ADD')
+        row.operator("dayz.remove_named_property", text="Remove", icon='REMOVE')
+        
+        # Show named properties
+        if settings.named_properties:
+            for i, prop_item in enumerate(settings.named_properties):
+                prop_box = box.box()
+                
+                row = prop_box.row()
+                row.label(text=f"Property {i+1}:")
+                
+                col = prop_box.column()
+                col.prop(prop_item, "name", text="Name")
+                col.prop(prop_item, "value", text="Value")
+        else:
+            box.label(text="No properties added", icon='INFO')
+
+        layout.separator()
+
+        # Process Button
+        row = layout.row()
+        row.scale_y = 2.0
+        
+        # Enable/disable button based on settings
+        if not settings.target_directory or not settings.named_properties:
+            row.enabled = False
+        
+        row.operator("dayz.process_batch_properties", text="Process", icon='PLAY')
+        
+        # Show status info
+        if not settings.target_directory:
+            layout.label(text="Select target directory", icon='ERROR')
+        elif not settings.named_properties:
+            layout.label(text="Add at least one property", icon='ERROR')
+
 class DAYZ_PT_GrassPlacerPanel(bpy.types.Panel):
     """Grass placer panel within DayZ tools"""
     bl_label = "Grass Placer"
