@@ -182,6 +182,9 @@ class DAYZ_OT_RemoveGrassObject(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
+        # Safety check - make sure the property exists
+        if not hasattr(context.scene, 'dayz_grass_placer_settings'):
+            return False
         settings = context.scene.dayz_grass_placer_settings
         return len(settings.grass_objects) > 0
 
