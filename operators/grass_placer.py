@@ -6,6 +6,7 @@ Automates placing grass meshes onto target surfaces with normal alignment
 import bpy
 import bmesh
 import random
+import time
 from mathutils import Vector, Matrix
 from mathutils.bvhtree import BVHTree
 from math import radians, sqrt
@@ -46,6 +47,8 @@ class DAYZ_GrassPlacerSettings(bpy.types.PropertyGroup):
         type=DAYZ_TargetObject
     )
     
+    target_objects_index: bpy.props.IntProperty(default=0)
+    
     # Grass objects collection
     grass_objects: bpy.props.CollectionProperty(
         type=DAYZ_GrassObject
@@ -54,6 +57,20 @@ class DAYZ_GrassPlacerSettings(bpy.types.PropertyGroup):
     grass_objects_index: bpy.props.IntProperty(default=0)
     
     # Placement settings
+    use_density_mode: bpy.props.BoolProperty(
+        name="Density Mode",
+        description="Use density per square unit instead of total count",
+        default=False
+    )
+    
+    density: bpy.props.FloatProperty(
+        name="Density",
+        description="Number of grass instances per square unit",
+        default=10.0,
+        min=0.01,
+        max=1000.0
+    )
+    
     total_count: bpy.props.IntProperty(
         name="Total Count",
         description="Number of grass instances per target object",
@@ -131,35 +148,79 @@ class DAYZ_GrassPlacerSettings(bpy.types.PropertyGroup):
     )
 
 # Operators
-class DAYZ_OT_SetGrassTargets(bpy.types.Operator):
-    """Set selected mesh objects as grass targets"""
-    bl_idname = "dayz.set_grass_targets"
-    bl_label = "Set Target Objects"
-    bl_description = "Use selected mesh objects as targets for grass placement"
+class DAYZ_OT_AddTargetObject(bpy.types.Operator):
+    """Add a new target object slot"""
+    bl_idname = "dayz.add_target_object"
+    bl_label = "Add Target Object"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        settings = context.scene.dayz_grass_placer_settings
+        settings.target_objects.add()
+        settings.target_objects_index = len(settings.target_objects) - 1
+        return {'FINISHED'}
+
+class DAYZ_OT_RemoveTargetObject(bpy.types.Operator):
+    """Remove selected target object slot"""
+    bl_idname = "dayz.remove_target_object"
+    bl_label = "Remove Target Object"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
     def poll(cls, context):
-        return len(context.selected_objects) > 0
+        if not hasattr(context.scene, 'dayz_grass_placer_settings'):
+            return False
+        settings = context.scene.dayz_grass_placer_settings
+        return len(settings.target_objects) > 0 and 0 <= settings.target_objects_index < len(settings.target_objects)
+
+    def execute(self, context):
+        settings = context.scene.dayz_grass_placer_settings
+        index = settings.target_objects_index
+        
+        if 0 <= index < len(settings.target_objects):
+            settings.target_objects.remove(index)
+            if settings.target_objects_index >= len(settings.target_objects):
+                settings.target_objects_index = max(0, len(settings.target_objects) - 1)
+        
+        return {'FINISHED'}
+
+class DAYZ_OT_AddSelectedToTargets(bpy.types.Operator):
+    """Add selected mesh objects as grass targets"""
+    bl_idname = "dayz.add_selected_to_targets"
+    bl_label = "Add Selected to Targets"
+    bl_description = "Add selected mesh objects to the list of targets for grass placement"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return any(obj.type == 'MESH' for obj in context.selected_objects)
 
     def execute(self, context):
         settings = context.scene.dayz_grass_placer_settings
         
-        # Clear existing targets
-        settings.target_objects.clear()
-        
-        # Add selected mesh objects
         mesh_objects = [obj for obj in context.selected_objects if obj.type == 'MESH']
-        
-        if not mesh_objects:
-            self.report({'WARNING'}, "No mesh objects selected")
-            return {'CANCELLED'}
         
         for obj in mesh_objects:
             target = settings.target_objects.add()
             target.obj = obj
         
-        self.report({'INFO'}, f"Set {len(mesh_objects)} target objects")
+        self.report({'INFO'}, f"Added {len(mesh_objects)} target objects")
+        return {'FINISHED'}
+
+class DAYZ_OT_ClearTargetObjects(bpy.types.Operator):
+    """Clear all target objects"""
+    bl_idname = "dayz.clear_target_objects"
+    bl_label = "Clear Target Objects"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if not hasattr(context.scene, 'dayz_grass_placer_settings'):
+            return False
+        return len(context.scene.dayz_grass_placer_settings.target_objects) > 0
+
+    def execute(self, context):
+        context.scene.dayz_grass_placer_settings.target_objects.clear()
         return {'FINISHED'}
 
 class DAYZ_OT_AddGrassObject(bpy.types.Operator):
@@ -182,7 +243,6 @@ class DAYZ_OT_RemoveGrassObject(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        # Safety check - make sure the property exists
         if not hasattr(context.scene, 'dayz_grass_placer_settings'):
             return False
         settings = context.scene.dayz_grass_placer_settings
@@ -194,10 +254,48 @@ class DAYZ_OT_RemoveGrassObject(bpy.types.Operator):
         
         if 0 <= index < len(settings.grass_objects):
             settings.grass_objects.remove(index)
-            # Adjust index to stay within bounds
             if settings.grass_objects_index >= len(settings.grass_objects):
                 settings.grass_objects_index = max(0, len(settings.grass_objects) - 1)
         
+        return {'FINISHED'}
+
+class DAYZ_OT_AddSelectedToGrassObjects(bpy.types.Operator):
+    """Add selected mesh objects to the grass list"""
+    bl_idname = "dayz.add_selected_to_grass"
+    bl_label = "Add Selected to Grass"
+    bl_description = "Add selected mesh objects to the grass list"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return any(obj.type == 'MESH' for obj in context.selected_objects)
+
+    def execute(self, context):
+        settings = context.scene.dayz_grass_placer_settings
+        mesh_objects = [obj for obj in context.selected_objects if obj.type == 'MESH']
+        
+        for obj in mesh_objects:
+            grass_item = settings.grass_objects.add()
+            grass_item.obj = obj
+            grass_item.weight = 1.0
+        
+        self.report({'INFO'}, f"Added {len(mesh_objects)} grass objects")
+        return {'FINISHED'}
+
+class DAYZ_OT_ClearGrassObjects(bpy.types.Operator):
+    """Clear all grass objects"""
+    bl_idname = "dayz.clear_grass_objects"
+    bl_label = "Clear Grass Objects"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if not hasattr(context.scene, 'dayz_grass_placer_settings'):
+            return False
+        return len(context.scene.dayz_grass_placer_settings.grass_objects) > 0
+
+    def execute(self, context):
+        context.scene.dayz_grass_placer_settings.grass_objects.clear()
         return {'FINISHED'}
 
 class DAYZ_OT_GenerateGrass(bpy.types.Operator):
@@ -208,6 +306,7 @@ class DAYZ_OT_GenerateGrass(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
+        start_time = time.time()
         settings = context.scene.dayz_grass_placer_settings
         
         # Validation
@@ -232,14 +331,29 @@ class DAYZ_OT_GenerateGrass(bpy.types.Operator):
         # Generate grass
         all_grass_instances = []
         grass_by_variant = {}  # For merge by variant option
+        grass_counts = {}
+        total_area = 0
+        
+        total_count_per_object = settings.total_count
         
         for target_ref in settings.target_objects:
             target_obj = target_ref.obj
             if not target_obj or target_obj.type != 'MESH':
                 continue
             
-            grass_instances = self.generate_on_object(context, target_obj, valid_grass, total_weight, settings)
+            mesh_area = self.calculate_mesh_area(target_obj)
+            total_area += mesh_area
+            
+            if settings.use_density_mode:
+                total_count_for_this_object = int(mesh_area * settings.density)
+            else:
+                total_count_for_this_object = total_count_per_object
+            
+            grass_instances, counts = self.generate_on_object(context, target_obj, valid_grass, total_weight, settings, total_count_for_this_object)
             all_grass_instances.extend(grass_instances)
+            
+            for name, count in counts.items():
+                grass_counts[name] = grass_counts.get(name, 0) + count
             
             # Group by variant for merge option
             if settings.merge_by_variant:
@@ -261,10 +375,45 @@ class DAYZ_OT_GenerateGrass(bpy.types.Operator):
             for grass in all_grass_instances:
                 grass.parent = empty
         
-        self.report({'INFO'}, f"Generated {len(all_grass_instances)} grass instances")
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        
+        # Format the report message
+        report_message = f"Generated {len(all_grass_instances)} grass instances in {elapsed_time:.2f} seconds"
+        self.report({'INFO'}, report_message)
+        
+        if total_area > 0:
+            actual_density = len(all_grass_instances) / total_area
+            self.report({'INFO'}, f"    Actual Density: {actual_density:.2f} grass/unit²")
+        
+        if grass_counts:
+            for name, count in sorted(grass_counts.items()):
+                self.report({'INFO'}, f"    {name} = {count}")
+        
         return {'FINISHED'}
     
-    def generate_on_object(self, context, target_obj, valid_grass, total_weight, settings):
+    def calculate_mesh_area(self, obj):
+        """Calculates the total surface area of a mesh object."""
+        if obj.type != 'MESH' or not obj.data:
+            return 0.0
+        
+        # Ensure we have the latest data
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        eval_obj = obj.evaluated_get(depsgraph)
+        
+        mesh = eval_obj.to_mesh()
+        
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        
+        area = sum(f.calc_area() for f in bm.faces)
+        
+        bm.free()
+        eval_obj.to_mesh_clear()
+        
+        return area
+    
+    def generate_on_object(self, context, target_obj, valid_grass, total_weight, settings, total_count_for_this_object):
         """Generate grass on a single target object"""
         
         # Get mesh data with modifiers applied
@@ -284,11 +433,12 @@ class DAYZ_OT_GenerateGrass(bpy.types.Operator):
         if total_area == 0:
             bm.free()
             target_eval.to_mesh_clear()
-            return []
+            return [], {}
         
         grass_instances = []
+        counts = {}
         
-        for i in range(settings.total_count):
+        for i in range(total_count_for_this_object):
             # Select random face weighted by area
             face = self.select_weighted_face(bm.faces, face_areas, total_area)
             if not face:
@@ -318,6 +468,8 @@ class DAYZ_OT_GenerateGrass(bpy.types.Operator):
             if not grass_obj:
                 continue
             
+            counts[grass_obj.name] = counts.get(grass_obj.name, 0) + 1
+            
             # Create grass instance
             grass_instance = self.create_grass_instance(context, grass_obj, point_world, normal_world, settings)
             if grass_instance:
@@ -327,7 +479,7 @@ class DAYZ_OT_GenerateGrass(bpy.types.Operator):
         bm.free()
         target_eval.to_mesh_clear()
         
-        return grass_instances
+        return grass_instances, counts
     
     def select_weighted_face(self, faces, face_areas, total_area):
         """Select a face weighted by area"""
@@ -463,9 +615,14 @@ grass_classes = (
     DAYZ_TargetObject,
     DAYZ_GrassObject,
     DAYZ_GrassPlacerSettings,
-    DAYZ_OT_SetGrassTargets,
+    DAYZ_OT_AddTargetObject,
+    DAYZ_OT_RemoveTargetObject,
+    DAYZ_OT_AddSelectedToTargets,
+    DAYZ_OT_ClearTargetObjects,
     DAYZ_OT_AddGrassObject,
     DAYZ_OT_RemoveGrassObject,
+    DAYZ_OT_AddSelectedToGrassObjects,
+    DAYZ_OT_ClearGrassObjects,
     DAYZ_OT_GenerateGrass,
 )
 

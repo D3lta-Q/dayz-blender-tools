@@ -12,6 +12,23 @@ class DAYZ_UL_NamedPropertiesList(bpy.types.UIList):
             layout.alignment = 'CENTER'
             layout.label(text=item.name or f"Property {index + 1}")
 
+class DAYZ_UL_TargetObjectsList(bpy.types.UIList):
+    """UIList for target objects"""
+    
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            row = layout.row(align=True)
+            if item.obj:
+                row.label(text=f"{index + 1}: {item.obj.name}", icon='OBJECT_DATA')
+            else:
+                row.label(text=f"{index + 1}: (No Object)", icon='ERROR')
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            if item.obj:
+                layout.label(text=item.obj.name, icon='OBJECT_DATA')
+            else:
+                layout.label(text=f"Target {index + 1}", icon='ERROR')
+
 class DAYZ_UL_GrassObjectsList(bpy.types.UIList):
     """UIList for grass objects"""
     
@@ -20,10 +37,10 @@ class DAYZ_UL_GrassObjectsList(bpy.types.UIList):
             row = layout.row(align=True)
             if item.obj:
                 row.label(text=f"{index + 1}: {item.obj.name}", icon='MESH_DATA')
-                row.label(text=f"Weight: {item.weight:.2f}")
+                row.prop(item, "weight", text="Weight", slider=True)
             else:
                 row.label(text=f"{index + 1}: (No Object)", icon='ERROR')
-                row.label(text=f"Weight: {item.weight:.2f}")
+                row.prop(item, "weight", text="Weight", slider=True)
         elif self.layout_type in {'GRID'}:
             layout.alignment = 'CENTER'
             if item.obj:
@@ -81,21 +98,18 @@ class DAYZ_PT_BatchPropertiesPanel(bpy.types.Panel):
         row = box.row(align=True)
         row.operator("dayz.add_named_property", text="Add", icon='ADD')
         
-        # Only enable remove if there are items and one is selected
         remove_row = row.row(align=True)
         remove_row.enabled = len(settings.named_properties) > 0
         remove_row.operator("dayz.remove_named_property", text="Remove", icon='REMOVE')
         
-        # UIList for named properties
         if settings.named_properties:
             box.template_list(
-                "DAYZ_UL_NamedPropertiesList", "",  # UIList class and identifier
-                settings, "named_properties",       # Collection object and property
-                settings, "named_properties_index", # Active index object and property
-                rows=3                              # Minimum rows to display
+                "DAYZ_UL_NamedPropertiesList", "",
+                settings, "named_properties",
+                settings, "named_properties_index",
+                rows=3
             )
             
-            # Show details for selected property
             if 0 <= settings.named_properties_index < len(settings.named_properties):
                 selected_prop = settings.named_properties[settings.named_properties_index]
                 prop_box = box.box()
@@ -113,13 +127,11 @@ class DAYZ_PT_BatchPropertiesPanel(bpy.types.Panel):
         row = layout.row()
         row.scale_y = 2.0
         
-        # Enable/disable button based on settings
         if not settings.target_directory or not settings.named_properties:
             row.enabled = False
         
         row.operator("dayz.process_batch_properties", text="Process", icon='PLAY')
         
-        # Show status info
         if not settings.target_directory:
             layout.label(text="Select target directory", icon='ERROR')
         elif not settings.named_properties:
@@ -141,15 +153,31 @@ class DAYZ_PT_GrassPlacerPanel(bpy.types.Panel):
         # Target Objects Section
         box = layout.box()
         box.label(text="Target Objects", icon='SURFACE_DATA')
-        box.operator("dayz.set_grass_targets", text="Set Selected as Targets", icon='PLUS')
+        
+        row = box.row(align=True)
+        row.operator("dayz.add_target_object", text="Add", icon='ADD')
+        remove_row = row.row(align=True)
+        remove_row.enabled = len(settings.target_objects) > 0
+        remove_row.operator("dayz.remove_target_object", text="Remove", icon='REMOVE')
+        
+        row = box.row(align=True)
+        row.operator("dayz.add_selected_to_targets", text="Add Selected", icon='PLUS')
+        clear_row = row.row(align=True)
+        clear_row.enabled = len(settings.target_objects) > 0
+        clear_row.operator("dayz.clear_target_objects", text="Clear", icon='X')
         
         if settings.target_objects:
-            col = box.column()
-            for target in settings.target_objects:
-                if target.obj:
-                    col.label(text=f"• {target.obj.name}", icon='OBJECT_DATA')
-                else:
-                    col.label(text="• (Missing Object)", icon='ERROR')
+            box.template_list(
+                "DAYZ_UL_TargetObjectsList", "",
+                settings, "target_objects",
+                settings, "target_objects_index",
+                rows=3
+            )
+            
+            if 0 <= settings.target_objects_index < len(settings.target_objects):
+                selected_target = settings.target_objects[settings.target_objects_index]
+                target_box = box.box()
+                target_box.prop(selected_target, "obj", text="Target Object")
         else:
             box.label(text="No targets set", icon='INFO')
 
@@ -159,24 +187,26 @@ class DAYZ_PT_GrassPlacerPanel(bpy.types.Panel):
         box = layout.box()
         box.label(text="Grass Objects", icon='MESH_DATA')
         
-        row = box.row()
+        row = box.row(align=True)
         row.operator("dayz.add_grass_object", text="Add", icon='ADD')
-        
-        # Only enable remove if there are items
         remove_row = row.row(align=True)
         remove_row.enabled = len(settings.grass_objects) > 0
         remove_row.operator("dayz.remove_grass_object", text="Remove", icon='REMOVE')
+
+        row = box.row(align=True)
+        row.operator("dayz.add_selected_to_grass", text="Add Selected", icon='PLUS')
+        clear_row = row.row(align=True)
+        clear_row.enabled = len(settings.grass_objects) > 0
+        clear_row.operator("dayz.clear_grass_objects", text="Clear", icon='X')
         
-        # UIList for grass objects
         if settings.grass_objects:
             box.template_list(
-                "DAYZ_UL_GrassObjectsList", "",     # UIList class and identifier
-                settings, "grass_objects",          # Collection object and property
-                settings, "grass_objects_index",    # Active index object and property
-                rows=3                              # Minimum rows to display
+                "DAYZ_UL_GrassObjectsList", "",
+                settings, "grass_objects",
+                settings, "grass_objects_index",
+                rows=3
             )
             
-            # Show details for selected grass object
             if 0 <= settings.grass_objects_index < len(settings.grass_objects):
                 selected_grass = settings.grass_objects[settings.grass_objects_index]
                 grass_box = box.box()
@@ -195,7 +225,16 @@ class DAYZ_PT_GrassPlacerPanel(bpy.types.Panel):
         box.label(text="Placement Settings", icon='SETTINGS')
         
         col = box.column()
-        col.prop(settings, "total_count")
+        col.prop(settings, "use_density_mode")
+        
+        row = col.row()
+        row.enabled = settings.use_density_mode
+        row.prop(settings, "density")
+        
+        row = col.row()
+        row.enabled = not settings.use_density_mode
+        row.prop(settings, "total_count")
+        
         col.prop(settings, "surface_offset")
         col.prop(settings, "distribution_seed")
 
@@ -246,7 +285,8 @@ class DAYZ_PT_GrassPlacerPanel(bpy.types.Panel):
 
 # Register panels
 panels = (
-    DAYZ_UL_NamedPropertiesList,    # Add the UIList classes
+    DAYZ_UL_NamedPropertiesList,
+    DAYZ_UL_TargetObjectsList,
     DAYZ_UL_GrassObjectsList,
     DAYZ_PT_main_panel,
     DAYZ_PT_GrassPlacerPanel,
