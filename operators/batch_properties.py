@@ -72,7 +72,7 @@ class DAYZ_OT_RemoveNamedProperty(bpy.types.Operator):
         if not hasattr(context.scene, 'dayz_batch_properties_settings'):
             return False
         settings = context.scene.dayz_batch_properties_settings
-        return len(settings.named_properties) > 0
+        return len(settings.named_properties) > 0 and 0 <= settings.named_properties_index < len(settings.named_properties)
 
     def execute(self, context):
         settings = context.scene.dayz_batch_properties_settings
@@ -80,7 +80,9 @@ class DAYZ_OT_RemoveNamedProperty(bpy.types.Operator):
         
         if 0 <= index < len(settings.named_properties):
             settings.named_properties.remove(index)
-            settings.named_properties_index = max(0, index - 1)
+            # Adjust index to stay within bounds
+            if settings.named_properties_index >= len(settings.named_properties):
+                settings.named_properties_index = max(0, len(settings.named_properties) - 1)
         
         return {'FINISHED'}
 

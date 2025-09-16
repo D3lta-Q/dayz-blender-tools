@@ -186,7 +186,7 @@ class DAYZ_OT_RemoveGrassObject(bpy.types.Operator):
         if not hasattr(context.scene, 'dayz_grass_placer_settings'):
             return False
         settings = context.scene.dayz_grass_placer_settings
-        return len(settings.grass_objects) > 0
+        return len(settings.grass_objects) > 0 and 0 <= settings.grass_objects_index < len(settings.grass_objects)
 
     def execute(self, context):
         settings = context.scene.dayz_grass_placer_settings
@@ -194,7 +194,9 @@ class DAYZ_OT_RemoveGrassObject(bpy.types.Operator):
         
         if 0 <= index < len(settings.grass_objects):
             settings.grass_objects.remove(index)
-            settings.grass_objects_index = max(0, index - 1)
+            # Adjust index to stay within bounds
+            if settings.grass_objects_index >= len(settings.grass_objects):
+                settings.grass_objects_index = max(0, len(settings.grass_objects) - 1)
         
         return {'FINISHED'}
 
