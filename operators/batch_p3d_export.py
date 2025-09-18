@@ -380,12 +380,6 @@ class DAYZ_OT_BatchExportP3D(Operator, ExportHelper):
             row.prop(self, "custom_prefix", text="Prefix")
             row.prop(self, "custom_suffix", text="Suffix")
 
-# Classes to register
-batch_p3d_classes = (
-    DAYZ_OT_BatchExportP3D,
-    DAYZ_PT_BatchP3DPanel,
-)
-
 def register_batch_p3d():
     """Register batch P3D export classes"""
     for cls in batch_p3d_classes:
