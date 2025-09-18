@@ -283,6 +283,50 @@ class DAYZ_PT_GrassPlacerPanel(bpy.types.Panel):
         row.scale_y = 2.0
         row.operator("dayz.generate_grass", text="Generate Grass", icon='MOD_PARTICLES')
 
+# Panel for the batch P3D export tool
+class DAYZ_PT_BatchP3DPanel(bpy.types.Panel):
+    """Batch P3D export panel within DayZ tools"""
+    bl_label = "Batch P3D Export"
+    bl_idname = "DAYZ_PT_batch_p3d_panel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'DayZ Tools'
+    bl_parent_id = "DAYZ_PT_main_panel"
+
+    def draw(self, context):
+        layout = self.layout
+        
+        # Info section
+        box = layout.box()
+        box.label(text="Export Individual P3D Files", icon='EXPORT')
+        
+        selected_meshes = [obj for obj in context.selected_objects if obj.type == 'MESH']
+        total_meshes = len([obj for obj in context.scene.objects if obj.type == 'MESH'])
+        
+        col = box.column()
+        col.label(text=f"Selected meshes: {len(selected_meshes)}", icon='OBJECT_DATA')
+        col.label(text=f"Total meshes in scene: {total_meshes}", icon='SCENE_DATA')
+        
+        layout.separator()
+        
+        # Export button
+        row = layout.row()
+        row.scale_y = 2.0
+        
+        if selected_meshes:
+            row.operator("dayz.batch_export_p3d", text=f"Export {len(selected_meshes)} Objects as P3D", icon='EXPORT')
+        else:
+            row.operator("dayz.batch_export_p3d", text="Export All Meshes as P3D", icon='EXPORT')
+        
+        # Requirements info
+        layout.separator()
+        box = layout.box()
+        box.label(text="Requirements:", icon='INFO')
+        col = box.column(align=True)
+        col.label(text="• Arma 3 Object Builder addon", icon='DOT')
+        col.label(text="• Objects should be manifold meshes", icon='DOT')
+        col.label(text="• Materials should be properly set up", icon='DOT')
+
 # Register panels
 panels = (
     DAYZ_UL_NamedPropertiesList,
@@ -291,6 +335,8 @@ panels = (
     DAYZ_PT_main_panel,
     DAYZ_PT_GrassPlacerPanel,
     DAYZ_PT_BatchPropertiesPanel,
+    DAYZ_OT_BatchExportP3D,
+    DAYZ_PT_BatchP3DPanel,
 )
 
 def register():

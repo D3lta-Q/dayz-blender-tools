@@ -136,8 +136,8 @@ class DAYZ_GrassPlacerSettings(bpy.types.PropertyGroup):
     
     # Merge options
     merge_all_grass: bpy.props.BoolProperty(
-        name="Merge All Grass",
-        description="Merge all grass instances into a single object",
+        name="Merge Per Target",
+        description="Merge grass instances for each target object separately",
         default=False
     )
     
@@ -335,6 +335,7 @@ class DAYZ_OT_GenerateGrass(bpy.types.Operator):
         total_area = 0
         
         total_count_per_object = settings.total_count
+        merged_objects = []  # Track merged objects for per-target merging
         
         for target_ref in settings.target_objects:
             target_obj = target_ref.obj
@@ -355,42 +356,70 @@ class DAYZ_OT_GenerateGrass(bpy.types.Operator):
             for name, count in counts.items():
                 grass_counts[name] = grass_counts.get(name, 0) + count
             
-            # Group by variant for merge option
-            if settings.merge_by_variant:
+            # Handle merge per target object
+            if settings.merge_all_grass and grass_instances:
+                merged_name = self.generate_grass_name_from_target(target_obj.name)
+                merged_obj = self.merge_all_objects(context, grass_instances, merged_name)
+                if merged_obj:
+                    merged_objects.append(merged_obj)
+            
+            # Group by variant for merge option (per target)
+            elif settings.merge_by_variant and grass_instances:
+                target_grass_by_variant = {}
                 for grass_instance in grass_instances:
                     original_name = self.get_original_grass_name(grass_instance, valid_grass)
-                    if original_name not in grass_by_variant:
-                        grass_by_variant[original_name] = []
-                    grass_by_variant[original_name].append(grass_instance)
+                    if original_name not in target_grass_by_variant:
+                        target_grass_by_variant[original_name] = []
+                    target_grass_by_variant[original_name].append(grass_instance)
+                
+                self.merge_by_variants_per_target(context, target_grass_by_variant, target_obj.name)
         
-        # Handle merge options
-        if settings.merge_all_grass and all_grass_instances:
-            self.merge_all_objects(context, all_grass_instances, "DayZ_Merged_Grass")
-        elif settings.merge_by_variant and grass_by_variant:
-            self.merge_by_variants(context, grass_by_variant)
-        elif settings.parent_to_empty and all_grass_instances:
-            # Only parent to empty if not merging
+        # Handle organization for non-merged grass
+        if not settings.merge_all_grass and not settings.merge_by_variant and settings.parent_to_empty and all_grass_instances:
             empty = bpy.data.objects.new("DayZ_Grass_Container", None)
             context.collection.objects.link(empty)
             for grass in all_grass_instances:
                 grass.parent = empty
+        elif settings.merge_all_grass and settings.parent_to_empty and merged_objects:
+            # Parent merged objects to empty
+            empty = bpy.data.objects.new("DayZ_Grass_Container", None)
+            context.collection.objects.link(empty)
+            for merged_obj in merged_objects:
+                merged_obj.parent = empty
         
         end_time = time.time()
         elapsed_time = end_time - start_time
         
         # Format the report message
-        report_message = f"Generated {len(all_grass_instances)} grass instances in {elapsed_time:.2f} seconds"
+        if settings.merge_all_grass:
+            report_message = f"Generated and merged grass for {len(merged_objects)} target objects in {elapsed_time:.2f} seconds"
+        else:
+            report_message = f"Generated {len(all_grass_instances)} grass instances in {elapsed_time:.2f} seconds"
         self.report({'INFO'}, report_message)
         
         if total_area > 0:
             actual_density = len(all_grass_instances) / total_area
-            self.report({'INFO'}, f"    Actual Density: {actual_density:.2f} grass/unit²")
+            self.report({'INFO'}, f"    Actual Density: {actual_density:.2f} grass/unitÂ²")
         
         if grass_counts:
             for name, count in sorted(grass_counts.items()):
                 self.report({'INFO'}, f"    {name} = {count}")
         
         return {'FINISHED'}
+    
+    def generate_grass_name_from_target(self, target_name):
+        """Generate grass object name from target object name"""
+        # Handle terrain_chunk_xx_xx pattern
+        if "terrain_chunk_" in target_name:
+            # Extract the chunk coordinates
+            parts = target_name.split("_")
+            if len(parts) >= 4:
+                # Get the last two parts (coordinates)
+                coords = "_".join(parts[-2:])
+                return f"grass_{coords}"
+        
+        # For other naming patterns, just prefix with "grass_"
+        return f"grass_{target_name}"
     
     def calculate_mesh_area(self, obj):
         """Calculates the total surface area of a mesh object."""
@@ -568,9 +597,9 @@ class DAYZ_OT_GenerateGrass(bpy.types.Operator):
         return new_grass
     
     def merge_all_objects(self, context, objects_to_merge, merged_name):
-        """Merge all grass objects into a single object"""
+        """Merge all grass objects into a single object and return the merged object"""
         if not objects_to_merge:
-            return
+            return None
         
         # Deselect all objects
         bpy.ops.object.select_all(action='DESELECT')
@@ -586,13 +615,17 @@ class DAYZ_OT_GenerateGrass(bpy.types.Operator):
         bpy.ops.object.join()
         
         # Rename the merged object
-        context.view_layer.objects.active.name = merged_name
+        merged_obj = context.view_layer.objects.active
+        merged_obj.name = merged_name
+        
+        return merged_obj
     
-    def merge_by_variants(self, context, grass_by_variant):
-        """Merge grass objects by variant type"""
+    def merge_by_variants_per_target(self, context, grass_by_variant, target_name):
+        """Merge grass objects by variant type for a specific target"""
         for variant_name, objects in grass_by_variant.items():
             if len(objects) > 1:
-                self.merge_all_objects(context, objects, f"DayZ_{variant_name}_Merged")
+                merged_name = f"{self.generate_grass_name_from_target(target_name)}_{variant_name}"
+                self.merge_all_objects(context, objects, merged_name)
     
     def get_original_grass_name(self, grass_instance, valid_grass):
         """Get the name of the original grass object this instance came from"""
