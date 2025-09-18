@@ -327,7 +327,7 @@ class DAYZ_PT_BatchP3DPanel(bpy.types.Panel):
         col.label(text="• Objects should be manifold meshes", icon='DOT')
         col.label(text="• Materials should be properly set up", icon='DOT')
 
-# Register panels
+# Register panels - removed DAYZ_OT_BatchExportP3D as it's registered in operators module
 panels = (
     DAYZ_UL_NamedPropertiesList,
     DAYZ_UL_TargetObjectsList,
@@ -335,7 +335,6 @@ panels = (
     DAYZ_PT_main_panel,
     DAYZ_PT_GrassPlacerPanel,
     DAYZ_PT_BatchPropertiesPanel,
-    DAYZ_OT_BatchExportP3D,
     DAYZ_PT_BatchP3DPanel,
 )
 
