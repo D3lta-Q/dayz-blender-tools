@@ -327,7 +327,63 @@ class DAYZ_PT_BatchP3DPanel(bpy.types.Panel):
         col.label(text="• Objects should be manifold meshes", icon='DOT')
         col.label(text="• Materials should be properly set up", icon='DOT')
 
-# Register panels - removed DAYZ_OT_BatchExportP3D as it's registered in operators module
+# Panel for the Texturing & UV Mapping tools
+class DAYZ_PT_TexturingUVPanel(bpy.types.Panel):
+    """Texturing & UV Mapping panel within DayZ tools"""
+    bl_label = "Texturing & UV Mapping"
+    bl_idname = "DAYZ_PT_texturing_uv_panel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'DayZ Tools'
+    bl_parent_id = "DAYZ_PT_main_panel"
+
+    def draw(self, context):
+        layout = self.layout
+        
+        # UV Cleanup section
+        box = layout.box()
+        box.label(text="UV Map Cleanup", icon='GROUP_UVS')
+        
+        selected_meshes = [obj for obj in context.selected_objects if obj.type == 'MESH']
+        
+        col = box.column()
+        if selected_meshes:
+            col.label(text=f"Selected mesh objects: {len(selected_meshes)}", icon='OBJECT_DATA')
+            
+            # Show UV map info for selected objects
+            total_uv_maps = 0
+            for obj in selected_meshes[:3]:  # Show info for first 3 objects
+                if obj.data.uv_layers:
+                    uv_count = len(obj.data.uv_layers)
+                    total_uv_maps += uv_count
+                    col.label(text=f"  {obj.name}: {uv_count} UV maps", icon='DOT')
+                else:
+                    col.label(text=f"  {obj.name}: No UV maps", icon='DOT')
+            
+            if len(selected_meshes) > 3:
+                col.label(text=f"  ... and {len(selected_meshes) - 3} more objects", icon='DOT')
+        else:
+            col.label(text="No mesh objects selected", icon='INFO')
+        
+        layout.separator()
+        
+        # Clean UV Maps button
+        row = layout.row()
+        row.scale_y = 1.5
+        row.enabled = len(selected_meshes) > 0
+        row.operator("dayz.clean_empty_uv_maps", text="Clean Empty UV Maps", icon='TRASH')
+        
+        # Info section
+        layout.separator()
+        box = layout.box()
+        box.label(text="UV Cleanup Info:", icon='INFO')
+        col = box.column(align=True)
+        col.label(text="• Removes UV maps with all coordinates at (0,0)", icon='DOT')
+        col.label(text="• Preserves at least one UV map per object", icon='DOT')
+        col.label(text="• Safe operation - won't break your models", icon='DOT')
+        col.label(text="• Works on selected mesh objects only", icon='DOT')
+
+# Register panels
 panels = (
     DAYZ_UL_NamedPropertiesList,
     DAYZ_UL_TargetObjectsList,
@@ -336,6 +392,7 @@ panels = (
     DAYZ_PT_GrassPlacerPanel,
     DAYZ_PT_BatchPropertiesPanel,
     DAYZ_PT_BatchP3DPanel,
+    DAYZ_PT_TexturingUVPanel,
 )
 
 def register():
